@@ -4,6 +4,7 @@
 minetest.require("nature","cactus")
 minetest.require("nature","papyrus")
 minetest.require("nature","moss")
+minetest.require("nature","slimtrees")
 -- minetest.require("nature","blossom")
 minetest.require("nature","tree_growth")
 minetest.require("nature","seasons")

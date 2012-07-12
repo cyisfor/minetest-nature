@@ -1,7 +1,7 @@
 local growing = minetest.require("nature","growing")
 -- Papyrus growing
 
-papyrusPlague = true
+papyrusPlague = false
 
 if papyrusPlague then
    minetest.register_abm(
@@ -33,7 +33,7 @@ else
       {
          nodenames = { "default:papyrus" },
          interval = growing.growInterval,
-         chance = growing.abioChance,
+         chance = growing.abiochance/2,
 
          action = function(pos, node, active_object_count, active_object_count_wider)
 
@@ -45,8 +45,17 @@ else
                               return
                            end
                         else
+                           if dy == 1 then
+                              -- young papyrus doesn't survive as much
+                              if math.random(10)<9 then
+                                 minetest.env:remove_node(pos)
+                              end
+                           end
                            local wn = waterNear({x = pos.x, y = pos.y - dy, z = pos.z})
                            if wn == 0 or wn == 8 then
+                              -- papyrus dies if not connected to water
+                              -- or flooded
+                              minetest.env:remove_node(pos)
                               return
                            end
                            break
@@ -73,9 +82,9 @@ else
 
    minetest.register_abm(
       {
-         nodenames = { "default:dirt", "default:dirt_with_grass", "madblocks:grass_spring", "madblocks:grass_summer" },
-         interval = NATURE_GROW_INTERVAL,
-         chance = PAPYRUS_GROW_CHANCE,
+         nodenames = { "default:dirt", "default:dirt_with_grass", "nature:grass_spring", "nature:grass_summer" },
+         interval = growing.growInterval,
+         chance = growing.abiochance*2,
          action = function(pos, node, active_object_count, active_object_count_wider)
                      local air = minetest.env:get_node({x = pos.x, y = pos.y + 1, z = pos.z})
                      if (air.name == "air") then

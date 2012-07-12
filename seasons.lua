@@ -1,50 +1,44 @@
 local growing = minetest.require("nature","growing")
-local inspect = minetest.require("__builtin","inspect")
-local postinit = minetest.require("__builtin","postinit")
 local like = minetest.require("madblocks","like")("nature")
+local inspect = minetest.require("__builtin","inspect")
+-- local postinit = minetest.require("__builtin","postinit")
 
-local seasonLength = 12000
-
--- local inspect = dofile(minetest.get_modpath("nature").."/inspect.lua")
 local WEATHER_CHANGE_INTERVAL = 60
 
--- ***********************************************************************************
---		SEASONAL CHANGES					**************************************************
--- ***********************************************************************************
+local M = {
+   seasonLength = 12000,
+   currentSeason = 2,
+}
+
 local SEASON_FILE = minetest.get_worldpath()..'/nature.season'
-
--- copied from madblocks... damn circular dependencies!
--- also power plants, because identifying jungle grass sucks T_T
-
-local CURRENT_SEASON = 2
 
 function clearPerlin()
    perlin = nil
    -- make it grow in 4 new patterns every spring
    if CURRENT_SEASON==2 then
-      minetest.after(seasonLength/4,clearPerlin)
+      minetest.after(M.seasonLength/4,clearPerlin)
    else
       -- XXX: eh... this might be bad
-      minetest.after(seasonLength,clearPerlin)
+      minetest.after(M.seasonLength,clearPerlin)
    end
 end
 clearPerlin()
 
-local function set_season(t)
-   CURRENT_SEASON = t
+function M.setSeason(t)
+   M.currentSeason = t
    -- write to file
    local f = io.open(SEASON_FILE, "w")
-   f:write(CURRENT_SEASON)
+   f:write(M.currentSeason)
    io.close(f)
 end
 
 local f = io.open(SEASON_FILE, "r")
 if f ~= nil then
-   CURRENT_SEASON = f:read("*n")
+   M.currentSeason = f:read("*n")
    io.close(f)
 else
    print('could not find season file, creating one (setting spring).')
-   set_season(2)
+   M.setSeason(2)
 end
 
 local paused = false
@@ -57,25 +51,25 @@ local seasons = {
 
 function switch_seasons()
    if paused then 
-      print('season paused at '..seasons[CURRENT_SEASON])
+      print('season paused at '..seasons[M.currentSeason])
    else
-      set_season(CURRENT_SEASON%4+1)
-      print('changing to '..seasons[CURRENT_SEASON])
+      M.setSeason(M.currentSeason%4+1)
+      print('changing to '..seasons[M.currentSeason])
    end
-   minetest.after(seasonLength,switch_seasons)
+   minetest.after(M.seasonLength,switch_seasons)
 end
 
-minetest.after(seasonLength,switch_seasons)
+minetest.after(M.seasonLength,switch_seasons)
 
 minetest.register_chatcommand("season", {
 	params = "<season>",
 	description = "set the season",
 	func = function(name, param)
-		if param == 'winter' or param == 'Winter' then set_season(1)
-		elseif param == 'spring' or param == 'Spring' then set_season(2)
-		elseif param == 'summer' or param == 'Summer' then set_season(3)
-		elseif param == 'fall' or param == 'Fall' then set_season(4)
-		elseif param == 'pause' or param == 'Pause' then set_season(0)
+		if param == 'winter' or param == 'Winter' then M.setSeason(1)
+		elseif param == 'spring' or param == 'Spring' then M.setSeason(2)
+		elseif param == 'summer' or param == 'Summer' then M.setSeason(3)
+		elseif param == 'fall' or param == 'Fall' then M.setSeason(4)
+		elseif param == 'pause' or param == 'Pause' then M.setSeason(0)
                    paused = true
                    minetest.chat_send_player(name, "Season paused.")
                    return
@@ -88,9 +82,9 @@ minetest.register_chatcommand("season", {
 	end,
 })
 
-function seasonal(name,which)
+function M.seasonal(name,which)
    if which == nil then 
-      which = CURRENT_SEASON
+      which = M.currentSeason
    end
    local ret = "nature:"..name.."_"..seasons[which]
    return ret
@@ -108,8 +102,8 @@ local dhmo = {['default:water_source']=true,
               ['nature:ice_source']=true,
               ['nature:ice_flowing']=true}
 for season = 1,4,1 do
-   grasslike[seasonal('grass',season)] = true
-   leafish[seasonal('leaves',season)] = true
+   grasslike[M.seasonal('grass',season)] = true
+   leafish[M.seasonal('leaves',season)] = true
 end
 
 function arrayConcat(...) 
@@ -131,33 +125,33 @@ end
 
 function setTurf(pos,node,generate)
    if grasslike[node.name] then
-      add_node(pos,node.name,seasonal('grass'))
-      if not generate and CURRENT_SEASON == 1 then
+      add_node(pos,node.name,M.seasonal('grass'))
+      if not generate and M.currentSeason == 1 then
          -- winter kills stuff
          local above = {x=pos.x,y=pos.y+1,z=pos.z}
          local aboven = minetest.env:get_node_or_nil(above)
          if aboven ~= nil and growing.grows(aboven.name) then
             minetest.env:remove_node(above)
-         else
-            if aboven ~= nil and aboven.name ~= "air" then
-               -- XXX: for debugging
-               print(aboven.name.." survived winter")
-            end
+         -- else
+         --    if aboven ~= nil and aboven.name ~= "air" then
+         --       -- XXX: for debugging
+         --       print(aboven.name.." survived winter")
+         --    end
          end
       end
    elseif leafish[node.name] then
-      add_node(pos,node.name,seasonal('leaves'))
+      add_node(pos,node.name,M.seasonal('leaves'))
    elseif sandy[node.name] then
       above = minetest.env:get_node_or_nil({x=pos.x,y=pos.y+1,z=pos.z})      if above ~= nil and above.name == 'air' then
          local name = "sand"
          if node.name:find('desert') then
-            if CURRENT_SEASON == 1 then
+            if M.currentSeason == 1 then
                name = "nature:desertsand_winter"
             else
                name = "default:desert_sand"
             end
          else
-            if CURRENT_SEASON == 1 then
+            if M.currentSeason == 1 then
                name = "nature:sand_winter"
             else
                name = "default:sand"
@@ -169,7 +163,7 @@ function setTurf(pos,node,generate)
       above = minetest.env:get_node_or_nil({x=pos.x,y=pos.y+1,z=pos.z})
       if above ~= nil and above.name == 'air' then
          local which = "default:cactus"
-         if CURRENT_SEASON == 1 then
+         if M.currentSeason == 1 then
             which = "nature:cactus_winter"
          end
          add_node(pos,node.name,which)
@@ -178,7 +172,7 @@ function setTurf(pos,node,generate)
       above = minetest.env:get_node_or_nil({x=pos.x,y=pos.y+1,z=pos.z})
       if above ~= nil and above.name == 'air' then
          local prefix = "default:water"
-         if CURRENT_SEASON==1 then
+         if M.currentSeason==1 then
             prefix = "nature:ice"
          end
          local suffix = "source"
@@ -288,85 +282,10 @@ for i,pair in ipairs({
    end
 end
 
---		SLIMTREES							**************************************************
--- ***********************************************************************************
-minetest.register_abm({
-		nodenames = { "nature:slimtree" },
-		interval = growing.growInterval,
-		chance = 10/8,
-		
-		action = function(pos, node, active_object_count, active_object_count_wider)
-                            for dy = 0,3,1 do
-                               minetest.env:add_node({x=pos.x,y=pos.y+dy,z=pos.z},{type="node",name="nature:slimtree_wood"})
-                            end
-                            for dx=-1,1,1 do
-                               for dz = -1,1,1 do
-                                  for dy = 3,6,1 do
-                                     if not (dx == 0 and dz == 0 and dy == 3) then                                       
-                                        minetest.env:add_node(
-                                           {x=pos.x+dx,y=pos.y+dy,z=pos.z+dz},
-                                           {type="node",name=seasonal("leaves")})
-                                     end
-                                  end
-                               end
-                            end
-                         end
-             })
--- make sure these tiny trees don't eat the landscape
--- by having their wood die (leaves die on their own)
-minetest.register_abm({
-		nodenames = { "nature:slimtree_wood" },
-		interval = growing.growInterval*2,
-		chance = 30/8,
-		
-		action = function(pos, node, active_object_count, active_object_count_wider)
-                            -- make sure to remove the whole tree
-                            -- part of a slimtree trunk w/ floating leaves above
-                            -- looks silly
-                            minetest.env:remove_node(pos)
-                            for dy = 1,3 do
-                               local npos = {pos.x,pos.y+dy,pos.z}
-                               if minetest.env:get_node(npos).name == node.name then
-                                  minetest.env:remove_node(npos)
-                               else
-                                  break
-                               end
-                            end
-
-                            for dy = 1,3 do
-                               local npos = {pos.x,pos.y-dy,pos.z}
-                               if minetest.env:get_node(npos).name == node.name then
-                                  minetest.env:remove_node(npos)
-                               else
-                                  break
-                               end
-                            end
-                         end
-             })
-
-like.plant('slimtree','Slimtree Sapling','veg')
-growing.add('nature:slimtree')
 like.plant('dandylions','Dandylions','veg')
 growing.add('nature:dandylions')
 like.plant('mushroom','Wild Mushroom','veg')
 growing.add('nature:mushroom')
-
-minetest.register_node("nature:slimtree_wood", {
-	description = "Slimtree",
-	drawtype = "fencelike",
-	tile_images = {"nature_tree.png"},
-	inventory_image = "nature_tree.png",
-	wield_image = "nature_tree.png",
-	paramtype = "light",
-	is_ground_content = true,
-	selection_box = {
-		type = "fixed",
-		fixed = {-1/7, -1/2, -1/7, 1/7, 1/2, 1/7},
-	},
-	groups = {tree=1,snappy=2,choppy=2,oddly_breakable_by_hand=2,flammable=2},
-	sounds = default.node_sound_wood_defaults(),
-	drop = 'default:fence_wood',
-})
 
 -- function isGround(pos)
 --    local type = minetest.registered_nodes[minetest.env:get_node(pos).name]
@@ -378,7 +297,7 @@ minetest.register_node("nature:slimtree_wood", {
 --    function ()
 --       minetest.register_on_generated(
 --          function(minp, maxp, seed)
---             if CURRENT_SEASON == 3 then return end
+--             if M.currentSeason == 3 then return end
 --             for x = minp.x,maxp.x,1 do
 --                for z = minp.z,maxp.z,1 do
 --                   for y = minp.y,maxp.y,1 do                     
@@ -512,3 +431,5 @@ minetest.register_node("nature:desertsand_winter", {
 		footstep = {name="default_grass_footstep", gain=0.4},
 	}),
 })
+
+return M
